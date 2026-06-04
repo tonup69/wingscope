@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: wingscope
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: NODE_ENV=production node dist/index.cjs
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
