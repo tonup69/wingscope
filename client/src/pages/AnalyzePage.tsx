@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Upload, X, Loader2, CheckCircle2, AlertCircle, Download, Plus, FlaskConical, ChevronDown, ChevronUp, Dna } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -142,11 +142,7 @@ function AnalysisResult({ analysisId }: { analysisId: number }) {
       {/* Processing */}
       {(analysis.status === "processing" || analysis.status === "pending") && (
         <CardContent className="pb-4">
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <Loader2 size={14} className="animate-spin text-primary" />
-            <span>Analyzing wing morphology, severity, and gene candidates…</span>
-          </div>
-          <Progress value={undefined} className="mt-3 h-1" />
+          <AnalysisProgress />
         </CardContent>
       )}
 
@@ -308,6 +304,51 @@ function AnalysisResult({ analysisId }: { analysisId: number }) {
         </CardContent>
       )}
     </Card>
+  );
+}
+
+const STAGES = [
+  { label: "Loading image…",                 pct: 8,  duration: 800  },
+  { label: "Inspecting wing margin…",         pct: 25, duration: 3000 },
+  { label: "Mapping vein architecture…",      pct: 45, duration: 3000 },
+  { label: "Assessing severity…",             pct: 62, duration: 2500 },
+  { label: "Classifying signaling pathway…",  pct: 78, duration: 3000 },
+  { label: "Ranking gene candidates…",        pct: 90, duration: 2000 },
+  { label: "Finalizing results…",             pct: 97, duration: 1500 },
+];
+
+function AnalysisProgress() {
+  const [stageIdx, setStageIdx] = useState(0);
+  const [pct, setPct] = useState(0);
+
+  useEffect(() => {
+    // Animate to first stage immediately
+    const timer = setTimeout(() => setPct(STAGES[0].pct), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (stageIdx >= STAGES.length - 1) return;
+    const t = setTimeout(() => {
+      const next = stageIdx + 1;
+      setStageIdx(next);
+      setPct(STAGES[next].pct);
+    }, STAGES[stageIdx].duration);
+    return () => clearTimeout(t);
+  }, [stageIdx]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 size={14} className="animate-spin text-primary shrink-0" />
+        <span className="transition-all duration-500">{STAGES[stageIdx].label}</span>
+      </div>
+      <Progress value={pct} className="h-1.5 transition-all duration-700" />
+      <div className="flex justify-between text-xs text-muted-foreground/60">
+        <span>Step {Math.min(stageIdx + 1, STAGES.length)} of {STAGES.length}</span>
+        <span>{pct}%</span>
+      </div>
+    </div>
   );
 }
 
