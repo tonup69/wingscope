@@ -46,7 +46,7 @@ async function analyzeWingImage(imageBase64: string, mimeType: string): Promise<
   // Step 1: Focused margin inspection
   const describeResponse = await client.messages.create({
     model: "claude-opus-4-7",
-    max_tokens: 1500,
+    max_tokens: 3000,
     messages: [
       {
         role: "user",
@@ -105,7 +105,7 @@ Be precise and quantitative. Do not dismiss visible irregularities. A wing with 
   // Step 2: Classify using the description + both images
   const response = await client.messages.create({
     model: "claude-opus-4-7",
-    max_tokens: 2048,
+    max_tokens: 3000,
     messages: [
       {
         role: "user",
@@ -126,18 +126,59 @@ Be precise and quantitative. Do not dismiss visible irregularities. A wing with 
   const content = response.content[0];
   if (content.type !== "text") throw new Error("Unexpected response type");
 
-  // Parse the JSON response
+  // Parse the JSON response — with truncation recovery
   let parsed;
   try {
-    // Try to extract JSON if wrapped in markdown
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[0]);
-    } else {
-      parsed = JSON.parse(content.text);
+    const raw = jsonMatch ? jsonMatch[0] : content.text;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      // Response was truncated — repair by closing all open brackets
+      let repaired = raw;
+      // Count unclosed braces and brackets
+      let braces = 0, brackets = 0;
+      let inString = false, escape = false;
+      for (const ch of repaired) {
+        if (escape) { escape = false; continue; }
+        if (ch === '\\' && inString) { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') braces++;
+        else if (ch === '}') braces--;
+        else if (ch === '[') brackets++;
+        else if (ch === ']') brackets--;
+      }
+      // Trim trailing incomplete key/value (cut at last complete comma or colon-less value)
+      repaired = repaired.replace(/,?\s*"[^"]*"?\s*:?\s*[^,\}\]]*$/, '');
+      // Close any open string
+      if (inString) repaired += '"';
+      // Close open arrays and objects
+      repaired += ']'.repeat(Math.max(0, brackets));
+      repaired += '}'.repeat(Math.max(0, braces));
+      try {
+        parsed = JSON.parse(repaired);
+      } catch (e2) {
+        // Last resort: return a minimal valid response
+        parsed = {
+          predictions: [{ pathway: "Unknown", confidence: 0, reasoning: "Response truncated — please retry" }],
+          severity_score: 1,
+          severity_label: "Unknown",
+          severity_rationale: "Response truncated — please retry the analysis",
+          gene_candidates: [],
+          morphology: { vein_pattern: "Parse error", margin: "Parse error", size_shape: "Parse error", surface: "Parse error", overall_impression: "Response was truncated. Please retry." }
+        };
+      }
     }
   } catch (e) {
-    throw new Error("Failed to parse AI response: " + content.text.slice(0, 200));
+    parsed = {
+      predictions: [{ pathway: "Unknown", confidence: 0, reasoning: "Response error — please retry" }],
+      severity_score: 1,
+      severity_label: "Unknown",
+      severity_rationale: "Please retry the analysis",
+      gene_candidates: [],
+      morphology: { vein_pattern: "Error", margin: "Error", size_shape: "Error", surface: "Error", overall_impression: "Please retry." }
+    };
   }
 
   return parsed;
@@ -152,7 +193,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const mimeType = req.file.mimetype;
     const response = await client.messages.create({
       model: "claude-opus-4-7",
-      max_tokens: 2000,
+      max_tokens: 3000,
       messages: [{
         role: "user",
         content: [
