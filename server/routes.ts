@@ -45,7 +45,7 @@ async function analyzeWingImage(imageBase64: string, mimeType: string): Promise<
 
   // Step 1: Focused margin inspection
   const describeResponse = await client.messages.create({
-    model: "claude-opus-4-7",
+    model: "claude-sonnet-4-5",
     max_tokens: 3000,
     messages: [
       {
@@ -104,7 +104,7 @@ Be precise and quantitative. Do not dismiss visible irregularities. A wing with 
 
   // Step 2: Classify using the description + both images
   const response = await client.messages.create({
-    model: "claude-opus-4-7",
+    model: "claude-sonnet-4-5",
     max_tokens: 3000,
     messages: [
       {
@@ -192,7 +192,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const imageBase64 = req.file.buffer.toString("base64");
     const mimeType = req.file.mimetype;
     const response = await client.messages.create({
-      model: "claude-opus-4-7",
+      model: "claude-sonnet-4-5",
       max_tokens: 3000,
       messages: [{
         role: "user",
