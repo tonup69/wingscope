@@ -152,7 +152,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const mimeType = req.file.mimetype;
     const response = await client.messages.create({
       model: "claude-opus-4-7",
-      max_tokens: 600,
+      max_tokens: 2000,
       messages: [{
         role: "user",
         content: [
